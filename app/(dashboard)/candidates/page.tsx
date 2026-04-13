@@ -62,7 +62,7 @@ export default function CandidatesPage() {
     setUploading(true);
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('spreadsheet', file);
 
       const token = getToken();
       const res = await fetch(`${BASE_URL}/candidates/upload/${selectedJob}`, {
@@ -90,7 +90,7 @@ export default function CandidatesPage() {
     setUploading(true);
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('resume', file);
 
       const token = getToken();
       const res = await fetch(`${BASE_URL}/candidates/resume/${selectedJob}`, {
