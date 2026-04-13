@@ -17,17 +17,17 @@ export default function CreateJobPage() {
   const toast = useToast();
 
   useEffect(() => {
-    const fetchConstants = async () => {
+    const fetchCompanyDepartments = async () => {
       try {
-        const res: any = await apiClient.get('/config/constants');
-        const deps = res.data?.departments || [];
+        const res: any = await apiClient.get('/company/me');
+        const deps = res.data?.user?.company?.departments || [];
         setAvailableDepartments(deps);
         if (deps.length > 0) setFormData(prev => ({ ...prev, department: deps[0] }));
       } catch (err) {
-        console.error('Failed to load constants');
+        console.error('Failed to load company departments');
       }
     };
-    fetchConstants();
+    fetchCompanyDepartments();
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -47,17 +47,16 @@ export default function CreateJobPage() {
         department: formData.department,
         location: formData.location,
         description: formData.description,
-        requirements: formData.requiredSkills.split(',').map(s => s.trim()).filter(Boolean),
-        shortlistConfig: {
-          targetSize: Number(formData.shortlistSize),
-          weights: {
-            skills: Number(formData.skills),
-            experience: Number(formData.experience),
-            projects: Number(formData.projects),
-            credibility: Number(formData.credibility),
-            companyFit: Number(formData.companyFit)
-          }
-        }
+        requiredSkills: formData.requiredSkills.split(',').map(s => s.trim()).filter(Boolean),
+        shortlistSize: Number(formData.shortlistSize),
+        scoringWeights: {
+          skillMatch: Number(formData.skills),
+          experienceDepth: Number(formData.experience),
+          projectRelevance: Number(formData.projects),
+          credibility: Number(formData.credibility),
+          companyFit: Number(formData.companyFit),
+        },
+        status: 'open',
       };
 
       await apiClient.post('/jobs', payload);
