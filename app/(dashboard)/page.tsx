@@ -1,26 +1,7 @@
 'use client';
 
-const mockStats = [
-  { label: 'Active Jobs', value: '12', change: '+3 this week' },
-  { label: 'Total Candidates', value: '847', change: '+126 this week' },
-  { label: 'Screenings Run', value: '38', change: '+8 this week' },
-  { label: 'Avg. Match Score', value: '76.4%', change: '+2.1% vs last month' },
-];
-
-const mockJobs = [
-  { id: '1', title: 'Senior Backend Engineer', candidates: 64, status: 'screening', shortlist: 5 },
-  { id: '2', title: 'Product Designer', candidates: 38, status: 'open', shortlist: 3 },
-  { id: '3', title: 'ML Engineer', candidates: 112, status: 'completed', shortlist: 8 },
-  { id: '4', title: 'DevOps Specialist', candidates: 29, status: 'open', shortlist: 4 },
-  { id: '5', title: 'Frontend Developer', candidates: 55, status: 'draft', shortlist: 5 },
-];
-
-const mockTopCandidates = [
-  { name: 'Sarah K.', score: 94, role: 'ML Engineer', status: 'Shortlisted' },
-  { name: 'James M.', score: 91, role: 'Senior Backend Engineer', status: 'Shortlisted' },
-  { name: 'Aline U.', score: 88, role: 'ML Engineer', status: 'Under Review' },
-  { name: 'David R.', score: 85, role: 'Product Designer', status: 'Shortlisted' },
-];
+import { useState, useEffect } from 'react';
+import apiClient from '../lib/api';
 
 const statusBadge = (status: string) => {
   const styles: Record<string, string> = {
@@ -33,6 +14,45 @@ const statusBadge = (status: string) => {
 };
 
 export default function Dashboard() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const res: any = await apiClient.get('/dashboard');
+        setData(res.data.data);
+      } catch (err) {
+        console.error("Failed to load dashboard data", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <svg className="animate-spin h-8 w-8 text-[#09090b]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </div>
+    );
+  }
+
+  const overview = data?.overview || { activeJobs: 0, totalCandidates: 0, totalScreenings: 0 };
+  const recentJobs = data?.recentJobs || [];
+  const recentScreenings = data?.recentScreenings || [];
+
+  const liveStats = [
+    { label: 'Active Jobs', value: overview.activeJobs || '0', change: 'Current pipelines' },
+    { label: 'Total Candidates', value: overview.totalCandidates || '0', change: 'Across all jobs' },
+    { label: 'Screenings Run', value: overview.totalScreenings || '0', change: 'Total AI parsing runs' },
+    { label: 'Avg. Match Score', value: '-', change: 'Updates periodically' },
+  ];
+
   return (
     <div className="p-8 max-w-7xl mx-auto animate-fade-in">
       {/* Header */}
@@ -49,7 +69,7 @@ export default function Dashboard() {
 
       {/* Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        {mockStats.map((stat) => (
+        {liveStats.map((stat) => (
           <div key={stat.label} className="stat-card">
             <p className="text-sm text-[#71717a] mb-1">{stat.label}</p>
             <p className="text-2xl font-bold tracking-tight">{stat.value}</p>
@@ -65,30 +85,34 @@ export default function Dashboard() {
             <h2 className="font-semibold">Active Job Pipelines</h2>
             <a href="/jobs" className="text-sm text-[#71717a] hover:text-black transition-colors">View all →</a>
           </div>
-          <table className="w-full">
-            <thead>
-              <tr className="text-left text-xs text-[#a1a1aa] uppercase tracking-wider border-b border-[#f4f4f5]">
-                <th className="px-6 py-3 font-medium">Position</th>
-                <th className="px-6 py-3 font-medium">Candidates</th>
-                <th className="px-6 py-3 font-medium">Shortlist</th>
-                <th className="px-6 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mockJobs.map((job) => (
-                <tr key={job.id} className="table-row">
-                  <td className="px-6 py-4 font-medium">{job.title}</td>
-                  <td className="px-6 py-4 text-[#71717a]">{job.candidates}</td>
-                  <td className="px-6 py-4 text-[#71717a]">{job.shortlist}</td>
-                  <td className="px-6 py-4">
-                    <span className={`badge ${statusBadge(job.status)}`}>
-                      {job.status}
-                    </span>
-                  </td>
+          {recentJobs.length === 0 ? (
+            <div className="p-8 text-center text-[#71717a] text-sm">No active jobs found. Create one to get started.</div>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="text-left text-xs text-[#a1a1aa] uppercase tracking-wider border-b border-[#f4f4f5]">
+                  <th className="px-6 py-3 font-medium">Position</th>
+                  <th className="px-6 py-3 font-medium">Applicants</th>
+                  <th className="px-6 py-3 font-medium">Shortlist</th>
+                  <th className="px-6 py-3 font-medium">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {recentJobs.map((job: any) => (
+                  <tr key={job._id} className="table-row">
+                    <td className="px-6 py-4 font-medium">{job.title}</td>
+                    <td className="px-6 py-4 text-[#71717a]">{job.totalApplicants || 0}</td>
+                    <td className="px-6 py-4 text-[#71717a]">{job.shortlistSize || 0}</td>
+                    <td className="px-6 py-4">
+                      <span className={`badge ${statusBadge(job.status || 'open')}`}>
+                        {job.status || 'open'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {/* Top Candidates */}
@@ -97,45 +121,28 @@ export default function Dashboard() {
             <h2 className="font-semibold">Top Matched Candidates</h2>
           </div>
           <div className="divide-y divide-[#f4f4f5]">
-            {mockTopCandidates.map((c, i) => (
-              <div key={i} className="px-6 py-4 flex items-center justify-between hover:bg-[#fafafa] transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-[#09090b] text-white flex items-center justify-center text-xs font-bold">
-                    {c.name.charAt(0)}
+            {recentScreenings.length === 0 ? (
+              <div className="p-8 text-center text-[#71717a] text-sm">No candidates processed yet.</div>
+            ) : (
+              recentScreenings.map((c: any, i: number) => (
+                <div key={i} className="px-6 py-4 flex items-center justify-between hover:bg-[#fafafa] transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-[#09090b] text-white flex items-center justify-center text-xs font-bold">
+                      {c.candidate?.name?.charAt(0) || '?'}
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{c.candidate?.name || 'Unknown'}</p>
+                      <p className="text-xs text-[#a1a1aa] truncate max-w-[120px]">{c.job?.title || 'General'}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-sm">{c.name}</p>
-                    <p className="text-xs text-[#a1a1aa]">{c.role}</p>
+                  <div className="text-right">
+                    <p className="font-bold text-sm">{c.overallScore || 0}%</p>
+                    <p className="text-[10px] text-[#a1a1aa]">{c.isShortlisted ? 'Shortlisted' : 'Reviewed'}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-bold text-sm">{c.score}%</p>
-                  <p className="text-[10px] text-[#a1a1aa]">{c.status}</p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
-        </div>
-      </div>
-
-      {/* Activity Timeline */}
-      <div className="card p-6 mt-6">
-        <h2 className="font-semibold mb-4">Recent Activity</h2>
-        <div className="space-y-4">
-          {[
-            { time: '2 min ago', text: 'AI Screening completed for ML Engineer — 8 candidates shortlisted' },
-            { time: '1 hour ago', text: '14 new resumes uploaded to Senior Backend Engineer pipeline' },
-            { time: '3 hours ago', text: 'Shortlist notification emails sent to Product Designer candidates' },
-            { time: 'Yesterday', text: 'New job posting created: DevOps Specialist' },
-          ].map((activity, i) => (
-            <div key={i} className="flex gap-4 items-start">
-              <div className="w-2 h-2 rounded-full bg-[#09090b] mt-1.5 flex-shrink-0" />
-              <div>
-                <p className="text-sm">{activity.text}</p>
-                <p className="text-xs text-[#a1a1aa] mt-0.5">{activity.time}</p>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     </div>

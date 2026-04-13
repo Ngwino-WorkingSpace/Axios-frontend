@@ -29,7 +29,11 @@ export default function LoginPage() {
       
       // Redirect after a short delay
       setTimeout(() => {
-        router.push('/');
+        if (!response.data.user.companyId) {
+          router.push('/onboarding');
+        } else {
+          router.push('/');
+        }
       }, 1000);
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Invalid email or password');
