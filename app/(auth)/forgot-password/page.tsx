@@ -34,16 +34,13 @@ export default function ForgotPasswordPage() {
   return (
     <div className="min-h-screen flex bg-white font-sans text-[#09090b]">
       
-      {/* Left panel with Image inside Circle Container */}
+      {/* Left panel with Graphic */}
       <div className="hidden lg:flex lg:w-1/2 bg-[#f4f4f5] items-center justify-center p-12">
-        {/* Soft circle holding the graphic */}
-        <div className="w-[80%] max-w-[500px] aspect-square rounded-full bg-gradient-to-tr from-[#e4e4e7] to-white shadow-2xl flex items-center justify-center overflow-hidden border border-white/50 relative">
-          <img 
-            src="/forgot-password-bg.png" 
-            alt="Security Graphic" 
-            className="w-[85%] h-[85%] object-contain -translate-y-4"
-          />
-        </div>
+        <img 
+          src="/forgot-password-bg.png" 
+          alt="Security Graphic" 
+          className="w-full max-w-[600px] object-contain"
+        />
       </div>
 
       {/* Right panel with minimalist form */}
