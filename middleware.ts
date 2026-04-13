@@ -2,23 +2,25 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  // Get the token from cookies
   const token = request.cookies.get('token')?.value;
+  const pathname = request.nextUrl.pathname;
 
-  // Define public routes that don't require authentication
+  // Public routes that don't require authentication
   const isPublicRoute = 
-    request.nextUrl.pathname.startsWith('/login') ||
-    request.nextUrl.pathname.startsWith('/register') ||
-    request.nextUrl.pathname.startsWith('/forgot-password') ||
-    request.nextUrl.pathname.startsWith('/reset-password');
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/register') ||
+    pathname.startsWith('/forgot-password') ||
+    pathname.startsWith('/reset-password');
 
+  const isOnboardingRoute = pathname.startsWith('/onboarding');
+
+  // 1. No token + not public = redirect to login
   if (!token && !isPublicRoute) {
-    // Redirect unauthenticated users to the login page
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
+  // 2. Has token + on public auth page = redirect to dashboard
   if (token && isPublicRoute) {
-    // Redirect authenticated users away from public auth pages
     return NextResponse.redirect(new URL('/', request.url));
   }
 
@@ -27,14 +29,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico, sitemap.xml, robots.txt (metadata files)
-     * - all images (png, jpg, svg) inside public
-     */
     '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\.png$).*)',
   ],
 };

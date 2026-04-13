@@ -76,9 +76,7 @@ export default function OnboardingPage() {
         window.location.href = '/';
       }, 1000);
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to finish onboarding.');
-      // Proceeding to dashboard for now as a fallback since the mock might not exist 
-      setTimeout(() => { window.location.href = '/'; }, 1000);
+      toast.error(err.response?.data?.error || 'Failed to finish onboarding. Please try again.');
     }
   };
 

@@ -92,7 +92,7 @@ export default function Sidebar() {
       {/* Logout */}
       <div className={`p-4 border-t border-white/10 ${expanded ? '' : 'flex justify-center'}`}>
         <button
-          onClick={() => window.location.href = '/login'}
+          onClick={() => { document.cookie = 'token=; path=/; max-age=0'; window.location.href = '/login'; }}
           className={`flex items-center gap-3 w-full text-white/50 hover:text-white transition-colors hover:bg-white/5 p-2 rounded-lg ${expanded ? '' : 'justify-center'}`}
           title="Logout"
         >

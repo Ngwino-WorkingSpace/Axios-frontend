@@ -27,10 +27,9 @@ export default function CompanyProfile() {
   useEffect(() => {
     const fetchCompany = async () => {
       try {
-        const res: any = await apiClient.get('/companies');
-        const companies = res.data?.companies || res.data || [];
-        if (companies.length > 0) {
-          const c = companies[0];
+        const res: any = await apiClient.get('/company/me');
+        const c = res.data?.user?.company;
+        if (c) {
           setCompanyId(c._id);
           setFormData({
             name: c.name || '',
