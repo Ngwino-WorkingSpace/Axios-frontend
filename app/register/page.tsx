@@ -2,12 +2,24 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import apiClient from '../lib/api';
+import { useToast } from '../components/Toast';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({ name: '', email: '', password: '', confirm: '' });
   const [strength, setStrength] = useState({ score: 0, label: '', color: 'bg-[#e4e4e7]' });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // Auth API Loading and OTP States
+  const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const toast = useToast();
+
+  const router = useRouter();
 
   // Evaluate password strength in real-time
   useEffect(() => {
@@ -46,21 +58,110 @@ export default function RegisterPage() {
   const isPasswordStrongEnough = strength.score >= 3;
   const passwordsMatch = formData.password === formData.confirm && formData.password.length > 0;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isPasswordStrongEnough) {
-      alert('Please use a stronger password.');
+      toast.error('Please use a stronger password.');
       return;
     }
     if (!passwordsMatch) {
-      alert('Passwords do not match.');
+      toast.error('Passwords do not match.');
       return;
     }
-    window.location.href = '/onboarding';
+
+    setLoading(true);
+    try {
+      await apiClient.post('/auth/register', { 
+        name: formData.name, 
+        email: formData.email, 
+        password: formData.password 
+      });
+      toast.success('Registration initiated. Verification code sent to email.');
+      setShowOtpModal(true); // Open the verifier modal
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Registration failed. Try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otpCode.length !== 6) return;
+    
+    setVerifying(true);
+    try {
+      const res: any = await apiClient.post('/auth/verify-email', {
+        email: formData.email,
+        code: otpCode
+      });
+      
+      // Persist auth
+      document.cookie = `token=${res.data.token}; path=/; max-age=${30 * 24 * 60 * 60}; samesite=strict`;
+      
+      toast.success('Account verified successfully!');
+      setTimeout(() => {
+        router.push('/onboarding');
+      }, 1000);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Invalid or expired code.');
+      setVerifying(false);
+    }
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex relative">
+
+      {/* OTP Verification Modal Overlay */}
+      {showOtpModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in pointer-events-auto border border-[#e4e4e7]">
+            <div className="p-8">
+              <div className="w-12 h-12 rounded-full bg-[#f4f4f5] flex items-center justify-center mb-6">
+                <svg className="w-6 h-6 text-[#09090b]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-[#09090b] mb-2">Check your email</h2>
+              <p className="text-[#71717a] text-sm mb-6 leading-relaxed">
+                We've sent a 6-digit security code to <strong>{formData.email}</strong>. Please enter it below to verify your account.
+              </p>
+              
+              <form onSubmit={handleVerifyOtp} className="space-y-6">
+                <input 
+                  type="text" 
+                  autoFocus
+                  placeholder="000000" 
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                  className="w-full bg-[#f4f4f5] border-none text-center text-3xl tracking-[1em] font-bold py-4 rounded-xl outline-none focus:ring-2 focus:ring-[#09090b] transition-all"
+                  required 
+                />
+                
+                <button 
+                  type="submit" 
+                  disabled={verifying || otpCode.length !== 6}
+                  className="btn-primary w-full flex justify-center items-center py-3"
+                >
+                  {verifying ? (
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : "Verify Account"}
+                </button>
+              </form>
+            </div>
+            <div className="bg-[#f4f4f5] px-8 py-4 text-center border-t border-[#e4e4e7]">
+              <p className="text-xs text-[#71717a]">
+                Didn't receive the email? Check spam or <button onClick={() => { setShowOtpModal(false); setOtpCode(''); }} className="text-[#09090b] font-medium hover:underline">try another email</button>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Left panel with image */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <img src="/auth-bg.png" alt="" className="absolute inset-0 w-full h-full object-cover" />
@@ -178,10 +279,15 @@ export default function RegisterPage() {
             
             <button 
               type="submit" 
-              disabled={!isPasswordStrongEnough || !passwordsMatch || !formData.name || !formData.email}
-              className="btn-primary w-full mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!isPasswordStrongEnough || !passwordsMatch || !formData.name || !formData.email || loading}
+              className="btn-primary w-full mt-2 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
             >
-              Create Account
+              {loading ? (
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+              ) : "Create Account"}
             </button>
           </form>
 

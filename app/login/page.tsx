@@ -2,15 +2,40 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import apiClient from '../lib/api';
+import { useToast } from '../components/Toast';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const toast = useToast();
+  
+  const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    window.location.href = '/';
+    setLoading(true);
+    
+    try {
+      const response: any = await apiClient.post('/auth/login', { email, password });
+      
+      // Store token securely in cookies for Next.js Middleware Edge processing
+      document.cookie = `token=${response.data.token}; path=/; max-age=${30 * 24 * 60 * 60}; samesite=strict`;
+      
+      toast.success('Login successful! Redirecting...');
+      
+      // Redirect after a short delay
+      setTimeout(() => {
+        router.push('/');
+      }, 1000);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Invalid email or password');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -75,15 +100,20 @@ export default function LoginPage() {
                 </button>
               </div>
   
-              <button type="submit" className="btn-primary w-full mt-2">Sign in</button>
+              <button disabled={loading} type="submit" className="btn-primary w-full mt-2 flex justify-center items-center">
+                {loading ? (
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : 'Sign in'}
+              </button>
             </form>
           
-          <div className="mt-6 text-center text-sm">
-            <span className="text-[#71717a]">Don't have an account? </span>
-            <Link href="/register" className="font-medium text-[#09090b] hover:underline">
-              Create an account
-            </Link>
-          </div>
+            <div className="flex justify-between items-center mt-6">
+              <span className="text-sm text-[#71717a]">Don't have an account? <Link href="/register" className="font-medium text-[#09090b] hover:underline">Create an account</Link></span>
+              <Link href="/forgot-password" className="text-sm font-medium text-[#09090b] hover:underline">Forgot password?</Link>
+            </div>
 
           <p className="text-xs text-[#a1a1aa] text-center mt-8">
             By continuing, you agree to our <a href="#" className="underline text-[#71717a]">Terms of Service</a> and <a href="#" className="underline text-[#71717a]">Privacy Policy</a>.

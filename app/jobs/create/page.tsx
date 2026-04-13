@@ -1,18 +1,34 @@
 'use client';
 
-import { useState } from 'react';
-
-// Mock company data to demonstrate the department dropdown binding
-const MOCK_COMPANY_DEPARTMENTS = [
-  'Engineering', 'Marketing', 'Sales', 'Human Resources', 'Design'
-];
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import apiClient from '../../lib/api';
+import { useToast } from '../../components/Toast';
 
 export default function CreateJobPage() {
+  const [availableDepartments, setAvailableDepartments] = useState<string[]>([]);
   const [formData, setFormData] = useState({
-    title: '', department: MOCK_COMPANY_DEPARTMENTS[0], location: '', description: '',
+    title: '', department: '', location: '', description: '',
     requiredSkills: '', shortlistSize: '5',
     skills: '30', experience: '25', projects: '20', credibility: '15', companyFit: '10',
   });
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const toast = useToast();
+
+  useEffect(() => {
+    const fetchConstants = async () => {
+      try {
+        const res: any = await apiClient.get('/config/constants');
+        const deps = res.data?.departments || [];
+        setAvailableDepartments(deps);
+        if (deps.length > 0) setFormData(prev => ({ ...prev, department: deps[0] }));
+      } catch (err) {
+        console.error('Failed to load constants');
+      }
+    };
+    fetchConstants();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -20,11 +36,38 @@ export default function CreateJobPage() {
 
   const total = Number(formData.skills) + Number(formData.experience) + Number(formData.projects) + Number(formData.credibility) + Number(formData.companyFit);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (total !== 100) { alert('Scoring weights must total 100%'); return; }
-    alert('Mock: Job created successfully');
-    window.location.href = '/jobs';
+    if (total !== 100) { toast.error('Scoring weights must total 100%'); return; }
+    
+    setLoading(true);
+    try {
+      const payload = {
+        title: formData.title,
+        department: formData.department,
+        location: formData.location,
+        description: formData.description,
+        requirements: formData.requiredSkills.split(',').map(s => s.trim()).filter(Boolean),
+        shortlistConfig: {
+          targetSize: Number(formData.shortlistSize),
+          weights: {
+            skills: Number(formData.skills),
+            experience: Number(formData.experience),
+            projects: Number(formData.projects),
+            credibility: Number(formData.credibility),
+            companyFit: Number(formData.companyFit)
+          }
+        }
+      };
+
+      await apiClient.post('/jobs', payload);
+      toast.success('Job Pipeline created successfully!');
+      setTimeout(() => { router.push('/jobs'); }, 1000);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to create Job.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -44,7 +87,7 @@ export default function CreateJobPage() {
             <label className="text-sm font-medium">Department *</label>
             <select name="department" value={formData.department} onChange={handleChange} className="input w-full bg-white" required>
               <option value="" disabled>Select Department</option>
-              {MOCK_COMPANY_DEPARTMENTS.map(dep => (
+              {availableDepartments.map(dep => (
                 <option key={dep} value={dep}>{dep}</option>
               ))}
             </select>
@@ -84,7 +127,14 @@ export default function CreateJobPage() {
         </div>
 
         <div className="flex justify-end pt-4 border-t border-[#e4e4e7]">
-          <button type="submit" className="btn-primary">Create Job Pipeline</button>
+          <button disabled={loading} type="submit" className="btn-primary w-full md:w-auto flex items-center justify-center">
+            {loading ? (
+              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : "Create Job Pipeline"}
+          </button>
         </div>
       </form>
     </div>

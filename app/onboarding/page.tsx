@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import apiClient from '../lib/api';
+import { useToast } from '../components/Toast';
 
 const steps = [
   { id: 1, label: 'Company Info' },
@@ -9,11 +11,7 @@ const steps = [
   { id: 4, label: 'Complete' },
 ];
 
-const INDUSTRIES = [
-  'Financial Technology', 'E-commerce', 'Healthcare Technology', 
-  'Education Technology', 'Agriculture', 'Logistics', 'Consulting', 
-  'Telecommunications', 'Software Development'
-];
+  // Removed hardcoded INDUSTRIES; will fetch from backend.
 
 export default function OnboardingPage() {
   const [step, setStep] = useState(1);
@@ -24,6 +22,24 @@ export default function OnboardingPage() {
   });
 
   const [newDepartment, setNewDepartment] = useState('');
+  
+  // API Data
+  const [availableIndustries, setAvailableIndustries] = useState<string[]>([]);
+  const [availableDepartments, setAvailableDepartments] = useState<string[]>([]);
+  const toast = useToast();
+
+  useEffect(() => {
+    const fetchConstants = async () => {
+      try {
+        const res: any = await apiClient.get('/config/constants');
+        setAvailableIndustries(res.data?.industries || []);
+        setAvailableDepartments(res.data?.departments || []);
+      } catch (error) {
+        console.error('Failed to fetch config constants');
+      }
+    };
+    fetchConstants();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -52,7 +68,19 @@ export default function OnboardingPage() {
   const next = () => setStep(s => Math.min(s + 1, 4));
   const prev = () => setStep(s => Math.max(s - 1, 1));
 
-  const handleFinish = () => window.location.href = '/';
+  const handleFinish = async () => {
+    try {
+      await apiClient.post('/company/setup', formData);
+      toast.success('Company profile created successfully!');
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1000);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to finish onboarding.');
+      // Proceeding to dashboard for now as a fallback since the mock might not exist 
+      setTimeout(() => { window.location.href = '/'; }, 1000);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#fafafa] flex items-center justify-center p-6">
@@ -94,26 +122,54 @@ export default function OnboardingPage() {
                 <div className="space-y-1.5"><label className="text-sm font-medium">Contact Email *</label><input name="email" value={formData.email} onChange={handleChange} className="input w-full" type="email" required /></div>
                 
                 <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-sm font-medium">Industries (Select multiple)</label>
-                  <div className="flex flex-wrap gap-2 p-4 border border-[#e4e4e7] rounded-lg">
-                    {INDUSTRIES.map(ind => (
-                      <button
-                        key={ind}
-                        onClick={() => toggleIndustry(ind)}
-                        className={`badge cursor-pointer px-3 py-1.5 border transition-colors ${
-                          formData.industries.includes(ind) ? 'bg-[#09090b] text-white border-[#09090b]' : 'bg-[#fafafa] text-[#71717a] border-[#e4e4e7] hover:bg-[#f4f4f5]'
-                        }`}
-                      >
-                        {ind}
-                      </button>
-                    ))}
+                  <label className="text-sm font-medium">Industries</label>
+                  <div className="flex gap-2">
+                    <select 
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val && !formData.industries.includes(val)) {
+                          setFormData(prev => ({ ...prev, industries: [...prev.industries, val] }));
+                        }
+                        e.target.value = ""; // reset select
+                      }} 
+                      className="input flex-1 bg-white"
+                    >
+                      <option value="">Select an industry...</option>
+                      {availableIndustries.map(ind => (
+                        <option key={ind} value={ind}>{ind}</option>
+                      ))}
+                    </select>
                   </div>
+                  {formData.industries.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-3 p-4 border border-[#e4e4e7] rounded-lg">
+                      {formData.industries.map(ind => (
+                        <span key={ind} className="badge bg-[#09090b] text-white px-3 py-1.5 flex items-center gap-1 transition-colors">
+                          {ind} <button onClick={() => toggleIndustry(ind)} className="text-white/70 hover:text-red-400 ml-1">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="text-sm font-medium">Departments</label>
                   <div className="flex gap-2">
-                    <input value={newDepartment} onChange={(e) => setNewDepartment(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addDepartment()} placeholder="e.g. Engineering, Sales, HR" className="input flex-1" />
+                    <select 
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val && !formData.departments.includes(val)) {
+                          setFormData(prev => ({ ...prev, departments: [...prev.departments, val] }));
+                        }
+                        e.target.value = ""; // reset select
+                      }} 
+                      className="input w-2/3 bg-white"
+                    >
+                      <option value="">Select predefined department...</option>
+                      {availableDepartments.map(dep => (
+                        <option key={dep} value={dep}>{dep}</option>
+                      ))}
+                    </select>
+                    <input value={newDepartment} onChange={(e) => setNewDepartment(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addDepartment()} placeholder="Or type custom..." className="input flex-1" />
                     <button onClick={addDepartment} className="btn-outline">Add</button>
                   </div>
                   {formData.departments.length > 0 && (
