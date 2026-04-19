@@ -19,12 +19,23 @@ export default function DashboardLayout({
     const checkOnboarding = async () => {
       try {
         const res: any = await apiClient.get('/company/me');
-        if (!res.data?.user?.company) {
-          // No company = not onboarded, redirect
-          router.replace('/onboarding');
-          return;
+        const hasCompany = !!res.data?.user?.company;
+
+        if (!hasCompany) {
+          // User needs to onboard
+          if (pathname !== '/onboarding') {
+            router.replace('/onboarding');
+          } else {
+            setAuthorized(true);
+          }
+        } else {
+          // User already has a company
+          if (pathname === '/onboarding') {
+            router.replace('/');
+          } else {
+            setAuthorized(true);
+          }
         }
-        setAuthorized(true);
       } catch (err) {
         // Token invalid or expired — clear and redirect
         document.cookie = 'token=; path=/; max-age=0';
