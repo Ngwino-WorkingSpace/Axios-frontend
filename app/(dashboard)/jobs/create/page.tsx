@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import apiClient from '../../../lib/api';
 import { useToast } from '../../../components/Toast';
+import { getApiErrorMessage } from '../../../lib/errors';
 
 export default function CreateJobPage() {
   const [availableDepartments, setAvailableDepartments] = useState<string[]>([]);
@@ -19,11 +20,11 @@ export default function CreateJobPage() {
   useEffect(() => {
     const fetchCompanyDepartments = async () => {
       try {
-        const res: any = await apiClient.get('/company/me');
+        const res = await apiClient.get<{ user?: { company?: { departments?: string[] } } }>('/company/me');
         const deps = res.data?.user?.company?.departments || [];
         setAvailableDepartments(deps);
         if (deps.length > 0) setFormData(prev => ({ ...prev, department: deps[0] }));
-      } catch (err) {
+      } catch {
         console.error('Failed to load company departments');
       }
     };
@@ -62,8 +63,8 @@ export default function CreateJobPage() {
       await apiClient.post('/jobs', payload);
       toast.success('Job Pipeline created successfully!');
       setTimeout(() => { router.push('/jobs'); }, 1000);
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to create Job.');
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Failed to create Job.'));
     } finally {
       setLoading(false);
     }

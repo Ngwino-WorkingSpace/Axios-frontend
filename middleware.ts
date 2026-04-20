@@ -12,9 +12,6 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/forgot-password') ||
     pathname.startsWith('/reset-password');
 
-  // /onboarding requires a token — must be logged in to onboard
-  const isOnboardingRoute = pathname.startsWith('/onboarding');
-
   // 1. No token + not a public page = kick to login
   if (!token && !isPublicRoute) {
     return NextResponse.redirect(new URL('/login', request.url));

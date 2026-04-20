@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import apiClient from '../../lib/api';
 import { useToast } from '../../components/Toast';
+import { getApiErrorMessage } from '../../lib/errors';
+import type { Candidate, Job } from '../../lib/types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'production' ? 'https://axios-2mom.onrender.com/api' : 'http://localhost:5000/api');
 
@@ -13,15 +15,9 @@ const getToken = (): string | null => {
   return match ? match[1] : null;
 };
 
-const statusColor = (s: string) => {
-  if (s === 'Shortlisted') return 'badge-success';
-  if (s === 'Under Review') return 'badge-warning';
-  return 'badge-neutral';
-};
-
 export default function CandidatesPage() {
-  const [candidates, setCandidates] = useState<any[]>([]);
-  const [jobs, setJobs] = useState<any[]>([]);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState('');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -29,31 +25,31 @@ export default function CandidatesPage() {
   const resumeInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
 
-  const fetchCandidates = async () => {
+  const fetchCandidates = useCallback(async () => {
     try {
-      const res: any = await apiClient.get('/candidates');
+      const res = await apiClient.get<{ data?: Candidate[] }>('/candidates');
       setCandidates(res.data?.data || []);
-    } catch (err) {
-      toast.error('Failed to load candidates');
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Failed to load candidates'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     const fetchJobs = async () => {
       try {
-        const res: any = await apiClient.get('/jobs');
+        const res = await apiClient.get<{ data?: Job[] }>('/jobs');
         const allJobs = res.data?.data || [];
         setJobs(allJobs);
-        if (allJobs.length > 0) setSelectedJob(allJobs[0]._id);
-      } catch (err) {
+        if (allJobs.length > 0) setSelectedJob(allJobs[0]._id || '');
+      } catch {
         console.error('Failed to load jobs');
       }
     };
     fetchJobs();
     fetchCandidates();
-  }, []);
+  }, [fetchCandidates]);
 
   const handleCSVUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -75,8 +71,8 @@ export default function CandidatesPage() {
 
       toast.success(data.message || `${data.count || 0} candidates imported!`);
       fetchCandidates();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to upload file');
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Failed to upload file'));
     } finally {
       setUploading(false);
       if (csvInputRef.current) csvInputRef.current.value = '';
@@ -103,8 +99,8 @@ export default function CandidatesPage() {
 
       toast.success(data.message || 'Resume parsed and candidate added!');
       fetchCandidates();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to upload resume');
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Failed to upload resume'));
     } finally {
       setUploading(false);
       if (resumeInputRef.current) resumeInputRef.current.value = '';

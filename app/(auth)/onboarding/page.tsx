@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import apiClient from '../../lib/api';
 import { useToast } from '../../components/Toast';
+import { getApiErrorMessage } from '../../lib/errors';
 
 const steps = [
   { id: 1, label: 'Company Info' },
@@ -31,10 +33,10 @@ export default function OnboardingPage() {
   useEffect(() => {
     const fetchConstants = async () => {
       try {
-        const res: any = await apiClient.get('/config/constants');
+        const res = await apiClient.get<{ industries?: string[]; departments?: string[] }>('/config/constants');
         setAvailableIndustries(res.data?.industries || []);
         setAvailableDepartments(res.data?.departments || []);
-      } catch (error) {
+      } catch {
         console.error('Failed to fetch config constants');
       }
     };
@@ -75,8 +77,8 @@ export default function OnboardingPage() {
       setTimeout(() => {
         window.location.href = '/';
       }, 1000);
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to finish onboarding. Please try again.');
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Failed to finish onboarding. Please try again.'));
     }
   };
 
@@ -85,7 +87,7 @@ export default function OnboardingPage() {
       <div className="w-full max-w-2xl">
         <div className="flex items-center gap-3 mb-10">
           <div className="w-8 h-8 rounded-full bg-black p-1.5 flex items-center justify-center flex-shrink-0">
-            <img src="/logo.png" alt="Axios" className="w-full h-full object-contain" />
+            <Image src="/logo.png" alt="Axios" width={32} height={32} className="w-full h-full object-contain" />
           </div>
           <span className="text-lg font-bold tracking-wider">AXIOS</span>
         </div>

@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import apiClient from '../../../lib/api';
 import { useToast } from '../../../components/Toast';
+import { getApiErrorMessage } from '../../../lib/errors';
+import type { Candidate } from '../../../lib/types';
 
 export default function CandidateDetailPage() {
   const { id } = useParams() as { id: string };
-  const [candidate, setCandidate] = useState<any>(null);
+  const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
 
@@ -16,16 +18,16 @@ export default function CandidateDetailPage() {
     if (!id) return;
     const fetchProfile = async () => {
       try {
-        const res: any = await apiClient.get(`/candidates/${id}`);
+        const res = await apiClient.get<{ candidate?: Candidate; data?: Candidate }>(`/candidates/${id}`);
         setCandidate(res.data?.candidate || res.data?.data || null);
-      } catch (err) {
-        toast.error('Failed to load candidate profile');
+      } catch (err: unknown) {
+        toast.error(getApiErrorMessage(err, 'Failed to load candidate profile'));
       } finally {
         setLoading(false);
       }
     };
     fetchProfile();
-  }, [id]);
+  }, [id, toast]);
 
   if (loading || !candidate) {
     return (
@@ -103,7 +105,7 @@ export default function CandidateDetailPage() {
           {/* Experience */}
           <div className="card p-6 space-y-4">
             <h2 className="font-semibold text-lg border-b border-[#f4f4f5] pb-2">Experience</h2>
-            {candidate.experience?.length ? candidate.experience.map((exp: any, i: number) => (
+            {candidate.experience?.length ? candidate.experience.map((exp, i) => (
               <div key={i} className="pb-4 border-b border-[#f4f4f5] last:border-0 last:pb-0 relative">
                 <div className="flex justify-between items-start mb-1">
                   <h3 className="font-medium text-base text-[#09090b]">{exp.role}</h3>
@@ -113,9 +115,9 @@ export default function CandidateDetailPage() {
                 </div>
                 <p className="text-sm text-[#3f3f46] mb-2 font-medium">{exp.company}</p>
                 {exp.description && <p className="text-sm text-[#71717a] leading-relaxed mb-2">{exp.description}</p>}
-                {exp.technologies?.length > 0 && (
+                {(exp.technologies?.length ?? 0) > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-2">
-                    {exp.technologies.map((t: string, j: number) => (
+                    {exp.technologies?.map((t, j) => (
                       <span key={j} className="text-[10px] uppercase tracking-wider font-semibold bg-[#e4e4e7] text-[#52525b] px-1.5 py-0.5 rounded">
                         {t}
                       </span>
@@ -129,7 +131,7 @@ export default function CandidateDetailPage() {
           {/* Projects */}
           <div className="card p-6 space-y-4">
             <h2 className="font-semibold text-lg border-b border-[#f4f4f5] pb-2">Projects</h2>
-            {candidate.projects?.length ? candidate.projects.map((proj: any, i: number) => (
+            {candidate.projects?.length ? candidate.projects.map((proj, i) => (
               <div key={i} className="pb-4 border-b border-[#f4f4f5] last:border-0 last:pb-0">
                 <h3 className="font-medium text-base text-[#09090b]">{proj.name}</h3>
                 <p className="text-sm text-[#71717a] leading-relaxed mt-1">{proj.description}</p>
@@ -140,7 +142,7 @@ export default function CandidateDetailPage() {
           {/* Education */}
           <div className="card p-6 space-y-4">
             <h2 className="font-semibold text-lg border-b border-[#f4f4f5] pb-2">Education</h2>
-            {candidate.education?.length ? candidate.education.map((ed: any, i: number) => (
+            {candidate.education?.length ? candidate.education.map((ed, i) => (
               <div key={i} className="flex justify-between items-start">
                 <div>
                   <h3 className="font-medium text-base text-[#09090b]">{ed.degree}</h3>
@@ -156,7 +158,7 @@ export default function CandidateDetailPage() {
 
         <div className="space-y-6">
           {/* AI Analysis (If Screened) */}
-          {candidate.evaluations?.length > 0 && (
+          {(candidate.evaluations?.length ?? 0) > 0 && candidate.evaluations?.[0] && (
             <div className="card border-[#09090b] shadow-sm relative overflow-hidden">
               <div className="absolute top-0 left-0 w-full h-1 bg-[#09090b]"></div>
               <div className="p-6 space-y-4">
@@ -179,10 +181,10 @@ export default function CandidateDetailPage() {
           <div className="card p-6 space-y-4">
             <h2 className="font-semibold text-lg border-b border-[#f4f4f5] pb-2">Skills</h2>
             <div className="flex flex-wrap gap-2">
-              {candidate.skills?.length ? candidate.skills.map((s: any, i: number) => (
+              {candidate.skills?.length ? candidate.skills.map((s, i) => (
                 <span key={i} className="badge badge-neutral bg-[#f4f4f5] text-[#3f3f46] hover:bg-[#e4e4e7] cursor-default border-[#e4e4e7]">
                   {typeof s === 'string' ? s : s.name}
-                  {s.yearsOfExperience ? ` · ${s.yearsOfExperience}y` : ''}
+                  {typeof s === 'object' && s?.yearsOfExperience ? ` · ${s.yearsOfExperience}y` : ''}
                 </span>
               )) : <span className="text-sm text-[#a1a1aa] italic">No skills listed.</span>}
             </div>
@@ -193,7 +195,7 @@ export default function CandidateDetailPage() {
             <div>
               <h2 className="font-semibold text-lg border-b border-[#f4f4f5] pb-2 mb-3">Languages</h2>
               <div className="flex flex-wrap gap-2">
-                {candidate.languages?.length ? candidate.languages.map((l: any, i: number) => (
+                {candidate.languages?.length ? candidate.languages.map((l, i) => (
                   <span key={i} className="text-sm text-[#71717a]">
                     • {typeof l === 'string' ? l : l.name} 
                   </span>
@@ -201,14 +203,14 @@ export default function CandidateDetailPage() {
               </div>
             </div>
 
-            {candidate.certifications?.length > 0 && (
+            {(candidate.certifications?.length ?? 0) > 0 && (
               <div>
                 <h2 className="font-semibold text-lg border-b border-[#f4f4f5] pb-2 mb-3">Certifications</h2>
                 <div className="space-y-2">
-                  {candidate.certifications.map((c: any, i: number) => (
+                  {candidate.certifications?.map((c, i) => (
                     <div key={i} className="text-sm">
                       <span className="text-[#09090b] font-medium block">{typeof c === 'string' ? c : c.name}</span>
-                      {c.issuer && <span className="text-[#71717a] text-xs">Issued by {c.issuer}</span>}
+                      {typeof c === 'object' && c?.issuer && <span className="text-[#71717a] text-xs">Issued by {c.issuer}</span>}
                     </div>
                   ))}
                 </div>

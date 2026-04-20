@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import apiClient from '../../../lib/api';
 import { useToast } from '../../../components/Toast';
+import { getApiErrorMessage } from '../../../lib/errors';
+import type { Job } from '../../../lib/types';
 
 const statusBadge = (status: string) => {
   const styles: Record<string, string> = {
@@ -22,31 +24,31 @@ const getToken = (): string | null => {
 };
 
 export default function JobDetailPage() {
-  const { id } = useParams();
+  const { id } = useParams() as { id: string };
   const router = useRouter();
   const toast = useToast();
-  const [job, setJob] = useState<any>(null);
+  const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [screening, setScreening] = useState(false);
   const [uploading, setUploading] = useState(false);
   const csvInputRef = useRef<HTMLInputElement>(null);
   const resumeInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchJob = async () => {
+  const fetchJob = useCallback(async () => {
     try {
-      const res: any = await apiClient.get(`/jobs/${id}`);
+      const res = await apiClient.get<{ data?: Job }>(`/jobs/${id}`);
       setJob(res.data?.data || null);
-    } catch (err: any) {
-      toast.error('Failed to load job details');
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Failed to load job details'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, toast]);
 
   useEffect(() => {
     if (!id) return;
     fetchJob();
-  }, [id]);
+  }, [id, fetchJob]);
 
   const handleRunScreening = async () => {
     setScreening(true);
@@ -54,8 +56,8 @@ export default function JobDetailPage() {
       await apiClient.post(`/screening/${id}`);
       toast.success('AI Screening started successfully!');
       setTimeout(() => router.push(`/screening/${id}`), 1500);
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to start screening');
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Failed to start screening'));
     } finally {
       setScreening(false);
     }
@@ -82,8 +84,8 @@ export default function JobDetailPage() {
 
       toast.success(data.message || `${data.count || 0} candidates imported!`);
       fetchJob(); // Refresh candidate count
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to upload file');
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Failed to upload file'));
     } finally {
       setUploading(false);
       if (csvInputRef.current) csvInputRef.current.value = '';
@@ -111,8 +113,8 @@ export default function JobDetailPage() {
 
       toast.success(data.message || 'Resume parsed and candidate added!');
       fetchJob();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to upload resume');
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Failed to upload resume'));
     } finally {
       setUploading(false);
       if (resumeInputRef.current) resumeInputRef.current.value = '';
@@ -137,7 +139,7 @@ export default function JobDetailPage() {
     );
   }
 
-  const weights = job.scoringWeights || {};
+  const weights: Record<string, number> = job.scoringWeights || {};
 
   return (
     <div className="p-8 max-w-4xl mx-auto animate-fade-in">
@@ -216,8 +218,8 @@ export default function JobDetailPage() {
           
           <h3 className="font-medium text-sm pt-2">Required Skills</h3>
           <div className="flex flex-wrap gap-2">
-            {job.requiredSkills?.length > 0 ? (
-              job.requiredSkills.map((s: string) => (
+            {(job.requiredSkills?.length ?? 0) > 0 ? (
+              job.requiredSkills?.map((s: string) => (
                 <span key={s} className="badge badge-neutral">{s}</span>
               ))
             ) : (
@@ -231,7 +233,7 @@ export default function JobDetailPage() {
           <h2 className="font-semibold">AI Scoring Weights</h2>
           <div className="space-y-3">
             {Object.keys(weights).length > 0 ? (
-              Object.entries(weights).map(([key, value]: [string, any]) => (
+              Object.entries(weights).map(([key, value]) => (
                 <div key={key} className="flex items-center gap-3">
                   <span className="text-sm text-[#71717a] capitalize w-28">{key}</span>
                   <div className="flex-1 h-2 bg-[#f4f4f5] rounded-full overflow-hidden">

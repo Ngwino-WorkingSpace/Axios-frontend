@@ -7,55 +7,61 @@ const getToken = (): string | null => {
   return match ? match[1] : null;
 };
 
-const fetchClient = async (endpoint: string, options = {}) => {
+type ApiClientConfig = Omit<RequestInit, 'headers'> & { headers?: HeadersInit };
+type ApiResponse<T> = { data: T };
+
+const fetchClient = async <T = unknown>(endpoint: string, options: ApiClientConfig = {}): Promise<ApiResponse<T>> => {
   const url = `${BASE_URL}${endpoint}`;
   const token = getToken();
-  const config = {
+  const config: RequestInit = {
     ...options,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-      ...((options as any).headers || {}),
+      ...(options.headers || {}),
     },
   };
 
   // Skip Content-Type if it's multipart/form-data
-  if ((options as any).headers && (options as any).headers['Content-Type'] === 'multipart/form-data') {
-    delete (config as any).headers['Content-Type'];
+  const headersRecord = options.headers && typeof options.headers === 'object' ? (options.headers as Record<string, string>) : null;
+  if (headersRecord && headersRecord['Content-Type'] === 'multipart/form-data') {
+    (config.headers as Record<string, string>)['Content-Type'] = undefined as unknown as string;
+    delete (config.headers as Record<string, string>)['Content-Type'];
   }
 
   const response = await fetch(url, config);
 
-  let data;
+  let data: unknown;
   try {
     data = await response.json();
-  } catch (err) {
+  } catch {
     data = { error: 'Unknown API error' };
   }
 
   if (!response.ok) {
-    console.error('API Error:', data?.error || 'Unknown Error');
+    const maybeObj = data as { error?: string } | null;
+    console.error('API Error:', maybeObj?.error || 'Unknown Error');
     return Promise.reject({ response: { data } });
   }
 
-  return { data };
+  return { data: data as T };
 };
 
 const apiClient = {
-  get: (url: string) => fetchClient(url, { method: 'GET' }),
-  post: (url: string, body?: any, config?: any) => {
+  get: <T = unknown>(url: string) => fetchClient<T>(url, { method: 'GET' }),
+  post: <T = unknown>(url: string, body?: unknown, config?: ApiClientConfig) => {
     const isFormData = body instanceof FormData;
-    return fetchClient(url, {
+    return fetchClient<T>(url, {
       method: 'POST',
       body: isFormData ? body : JSON.stringify(body),
       ...config
     });
   },
-  put: (url: string, body?: any) => fetchClient(url, {
+  put: <T = unknown>(url: string, body?: unknown) => fetchClient<T>(url, {
     method: 'PUT',
     body: JSON.stringify(body)
   }),
-  delete: (url: string) => fetchClient(url, { method: 'DELETE' }),
+  delete: <T = unknown>(url: string) => fetchClient<T>(url, { method: 'DELETE' }),
 };
 
 export default apiClient;

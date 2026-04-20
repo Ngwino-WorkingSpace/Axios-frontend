@@ -2,9 +2,11 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import apiClient from '../../lib/api';
 import { useToast } from '../../components/Toast';
+import { getApiErrorMessage } from '../../lib/errors';
 
 function ResetPasswordForm() {
   const [email, setEmail] = useState('');
@@ -45,8 +47,8 @@ function ResetPasswordForm() {
       setTimeout(() => {
         router.push('/login');
       }, 1500);
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Invalid or expired code.');
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Invalid or expired code.'));
     } finally {
       setLoading(false);
     }
@@ -62,7 +64,7 @@ function ResetPasswordForm() {
       <div className="relative z-10 w-full max-w-md px-8 py-10 rounded-3xl backdrop-blur-xl bg-white/60 border border-white/20 shadow-2xl flex flex-col items-center animate-fade-in">
         
         <div className="w-12 h-12 rounded-full bg-[#09090b] flex items-center justify-center mb-6 shadow-lg">
-          <img src="/logo.png" alt="Axios" className="h-4 object-contain brightness-0 invert" />
+          <Image src="/logo.png" alt="Axios" width={64} height={16} className="h-4 w-auto object-contain brightness-0 invert" />
         </div>
 
         <h1 className="text-3xl font-extrabold text-[#09090b] mb-2 tracking-tight">Create new password</h1>
@@ -142,7 +144,7 @@ function ResetPasswordForm() {
       {/* Footer Branding */}
       <div className="absolute bottom-6 right-6 flex items-center bg-white/70 backdrop-blur-md px-3 py-1.5 rounded-full border border-black/5 shadow-sm">
         <span className="text-xs text-[#a1a1aa] mr-2 font-medium">presented by</span>
-        <img src="/logo.png" alt="Axios" className="h-3 object-contain opacity-80" />
+        <Image src="/logo.png" alt="Axios" width={48} height={12} className="h-3 w-auto object-contain opacity-80" />
       </div>
     </>
   );

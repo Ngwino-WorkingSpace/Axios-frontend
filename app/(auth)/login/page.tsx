@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import apiClient from '../../lib/api';
 import { useToast } from '../../components/Toast';
+import { getApiErrorMessage } from '../../lib/errors';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -20,7 +22,10 @@ export default function LoginPage() {
     setLoading(true);
     
     try {
-      const response: any = await apiClient.post('/auth/login', { email, password });
+      const response = await apiClient.post<{ token: string; user: { companyId?: string | null } }>(
+        '/auth/login',
+        { email, password }
+      );
       
       // Store token securely in cookies for Next.js Middleware Edge processing
       document.cookie = `token=${response.data.token}; path=/; max-age=${30 * 24 * 60 * 60}; samesite=strict`;
@@ -35,8 +40,8 @@ export default function LoginPage() {
           router.push('/');
         }
       }, 1000);
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Invalid email or password');
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Invalid email or password'));
     } finally {
       setLoading(false);
     }
@@ -46,13 +51,13 @@ export default function LoginPage() {
     <div className="min-h-screen flex">
       {/* Left panel with image */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        <img src="/auth-bg.png" alt="" className="absolute inset-0 w-full h-full object-cover" />
+        <Image src="/auth-bg.png" alt="" fill className="object-cover" priority />
           <div className="absolute inset-0 bg-black/30" />
             
           <div className="relative z-10 flex flex-col justify-between p-12 h-full">
             <div>
               <div className="w-10 h-10 rounded-full bg-black flex items-center justify-center p-2 mb-4">
-                <img src="/logo.png" alt="Axios Logo" className="w-full h-full object-contain" />
+                <Image src="/logo.png" alt="Axios Logo" width={32} height={32} className="w-full h-full object-contain" />
               </div>
             </div>
             
@@ -115,7 +120,7 @@ export default function LoginPage() {
             </form>
           
             <div className="flex justify-between items-center mt-6">
-              <span className="text-sm text-[#71717a]">Don't have an account? <Link href="/register" className="font-medium text-[#09090b] hover:underline">Create an account</Link></span>
+              <span className="text-sm text-[#71717a]">Don&apos;t have an account? <Link href="/register" className="font-medium text-[#09090b] hover:underline">Create an account</Link></span>
               <Link href="/forgot-password" className="text-sm font-normal text-[#71717a] hover:text-[#09090b] hover:underline transition-colors">Forgot password?</Link>
             </div>
 

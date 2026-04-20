@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
@@ -47,7 +48,7 @@ export default function Sidebar() {
       {/* Logo */}
       <div className={`flex items-center ${expanded ? 'px-6' : 'px-0 justify-center'} h-16 border-b border-white/10`}>
         <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center p-1.5 flex-shrink-0">
-          <img src="/logo.png" alt="Axios" className="w-full h-full object-contain" />
+          <Image src="/logo.png" alt="Axios" width={32} height={32} className="w-full h-full object-contain" />
         </div>
         {expanded && <span className="ml-3 text-lg font-bold tracking-wider text-white">AXIOS</span>}
       </div>

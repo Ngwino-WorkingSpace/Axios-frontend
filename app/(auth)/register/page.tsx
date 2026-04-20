@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import apiClient from '../../lib/api';
 import { useToast } from '../../components/Toast';
+import { getApiErrorMessage } from '../../lib/errors';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({ name: '', email: '', password: '', confirm: '' });
@@ -71,11 +73,14 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      const res: any = await apiClient.post('/auth/register', { 
+      const res = await apiClient.post<{ token?: string }>(
+        '/auth/register',
+        {
         name: formData.name, 
         email: formData.email, 
         password: formData.password 
-      });
+        }
+      );
       
       // Temp Hackathon Bypass: Auto-login disabled OTP barrier
       if (res.data.token) {
@@ -88,8 +93,8 @@ export default function RegisterPage() {
         toast.success('Account created successfully. Please verify your account.');
         setShowOtpModal(true); // Fallback for when email is enabled
       }
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Registration failed. Try again.');
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Registration failed. Try again.'));
       // Reset register form to try again on failure
       setFormData({ name: '', email: '', password: '', confirm: '' });
       setShowPassword(false);
@@ -105,7 +110,7 @@ export default function RegisterPage() {
     
     setVerifying(true);
     try {
-      const res: any = await apiClient.post('/auth/verify-email', {
+      const res = await apiClient.post<{ token: string }>('/auth/verify-email', {
         email: formData.email,
         code: otpCode
       });
@@ -117,8 +122,8 @@ export default function RegisterPage() {
       setTimeout(() => {
         router.push('/login'); // Redirect to login as requested
       }, 1500);
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Invalid or expired code.');
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Invalid or expired code.'));
       setVerifying(false);
     }
   };
@@ -139,7 +144,7 @@ export default function RegisterPage() {
               </div>
               <h2 className="text-2xl font-bold text-[#09090b] mb-2">Check your email</h2>
               <p className="text-[#71717a] text-sm mb-6 leading-relaxed">
-                We've sent a 6-digit security code to <strong>{formData.email}</strong>. Please enter it below to verify your account.
+                We&apos;ve sent a 6-digit security code to <strong>{formData.email}</strong>. Please enter it below to verify your account.
               </p>
               
               <form onSubmit={handleVerifyOtp} className="space-y-6">
@@ -169,7 +174,7 @@ export default function RegisterPage() {
             </div>
             <div className="bg-[#f4f4f5] px-8 py-4 text-center border-t border-[#e4e4e7]">
               <p className="text-xs text-[#71717a]">
-                Didn't receive the email? Check spam or <button onClick={() => { setShowOtpModal(false); setOtpCode(''); }} className="text-[#09090b] font-medium hover:underline">try another email</button>
+                Didn&apos;t receive the email? Check spam or <button onClick={() => { setShowOtpModal(false); setOtpCode(''); }} className="text-[#09090b] font-medium hover:underline">try another email</button>
               </p>
             </div>
           </div>
@@ -178,13 +183,13 @@ export default function RegisterPage() {
 
       {/* Left panel with image */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        <img src="/auth-bg.png" alt="" className="absolute inset-0 w-full h-full object-cover" />
+        <Image src="/auth-bg.png" alt="" fill className="object-cover" priority />
           <div className="absolute inset-0 bg-black/30" />
             
           <div className="relative z-10 flex flex-col justify-between p-12 h-full">
             <div>
               <div className="w-10 h-10 rounded-full bg-black flex items-center justify-center p-2 mb-4">
-                <img src="/logo.png" alt="Axios Logo" className="w-full h-full object-contain" />
+                <Image src="/logo.png" alt="Axios Logo" width={32} height={32} className="w-full h-full object-contain" />
               </div>
             </div>
             

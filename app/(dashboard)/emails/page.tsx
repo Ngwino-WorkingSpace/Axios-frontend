@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react';
 import apiClient from '../../lib/api';
 import { useToast } from '../../components/Toast';
+import { getApiErrorMessage } from '../../lib/errors';
+import type { Job } from '../../lib/types';
 
 export default function EmailsPage() {
-  const [jobs, setJobs] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -15,18 +17,18 @@ export default function EmailsPage() {
   useEffect(() => {
     const fetchJobs = async () => {
       try {
-        const res: any = await apiClient.get('/jobs');
+        const res = await apiClient.get<{ data?: Job[] }>('/jobs');
         const allJobs = res.data?.data || [];
         setJobs(allJobs);
-        if (allJobs.length > 0) setSelectedJob(allJobs[0]._id);
-      } catch (err) {
+        if (allJobs.length > 0) setSelectedJob(allJobs[0]._id || '');
+      } catch {
         toast.error('Failed to load job pipelines');
       } finally {
         setLoading(false);
       }
     };
     fetchJobs();
-  }, []);
+  }, [toast]);
 
   const handleSend = async () => {
     if (!selectedJob) {
@@ -35,13 +37,11 @@ export default function EmailsPage() {
     }
     setSending(true);
     try {
-      const res: any = await apiClient.post(`/emails/shortlist/${selectedJob}`);
+      const res = await apiClient.post<{ message?: string }>(`/emails/shortlist/${selectedJob}`);
       toast.success(res.data?.message || 'Emails dispatched successfully!');
       setSent(true);
-    } catch (err: any) {
-      // Email service is currently disabled — show a meaningful message
-      const msg = err.response?.data?.message || err.response?.data?.error || 'Email dispatch is currently disabled. SMTP is not configured.';
-      toast.error(msg);
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Email dispatch is currently disabled. SMTP is not configured.'));
     } finally {
       setSending(false);
     }

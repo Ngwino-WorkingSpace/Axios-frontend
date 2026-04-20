@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import apiClient from '../../lib/api';
 import { useToast } from '../../components/Toast';
+import { getApiErrorMessage } from '../../lib/errors';
+import type { Job } from '../../lib/types';
 
 const statusBadge = (status: string) => {
   const styles: Record<string, string> = {
@@ -13,23 +15,23 @@ const statusBadge = (status: string) => {
 };
 
 export default function JobsPage() {
-  const [jobs, setJobs] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
 
   useEffect(() => {
     const fetchJobs = async () => {
       try {
-        const res: any = await apiClient.get('/jobs');
+        const res = await apiClient.get<{ data?: Job[] }>('/jobs');
         setJobs(res.data?.data || []);
-      } catch (err: any) {
-        toast.error('Failed to load jobs');
+      } catch (err: unknown) {
+        toast.error(getApiErrorMessage(err, 'Failed to load jobs'));
       } finally {
         setLoading(false);
       }
     };
     fetchJobs();
-  }, []);
+  }, [toast]);
 
   if (loading) {
     return (
@@ -80,7 +82,7 @@ export default function JobsPage() {
                   <td className="px-6 py-4 text-[#71717a] text-sm">{job.location}</td>
                   <td className="px-6 py-4 text-sm">{job.candidates?.length || 0}</td>
                   <td className="px-6 py-4"><span className={`badge ${statusBadge(job.status || 'open')}`}>{job.status || 'open'}</span></td>
-                  <td className="px-6 py-4 text-[#a1a1aa] text-sm">{new Date(job.createdAt).toLocaleDateString() || 'Recently'}</td>
+                  <td className="px-6 py-4 text-[#a1a1aa] text-sm">{job.createdAt ? new Date(job.createdAt).toLocaleDateString() : 'Recently'}</td>
                   <td className="px-6 py-4"><Link href={`/jobs/${job._id || job.id}`} className="text-sm font-medium hover:underline">View →</Link></td>
                 </tr>
               ))

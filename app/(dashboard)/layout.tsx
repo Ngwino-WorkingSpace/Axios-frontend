@@ -18,7 +18,7 @@ export default function DashboardLayout({
   useEffect(() => {
     const checkOnboarding = async () => {
       try {
-        const res: any = await apiClient.get('/company/me');
+        const res = await apiClient.get<{ user?: { company?: unknown } }>('/company/me');
         const hasCompany = !!res.data?.user?.company;
 
         if (!hasCompany) {
@@ -36,7 +36,7 @@ export default function DashboardLayout({
             setAuthorized(true);
           }
         }
-      } catch (err) {
+      } catch {
         // Token invalid or expired — clear and redirect
         document.cookie = 'token=; path=/; max-age=0';
         router.replace('/login');
@@ -45,7 +45,7 @@ export default function DashboardLayout({
       }
     };
     checkOnboarding();
-  }, [pathname]);
+  }, [pathname, router]);
 
   if (!checked || !authorized) {
     return (

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import apiClient from '../../lib/api';
 import { useToast } from '../../components/Toast';
+import { getApiErrorMessage } from '../../lib/errors';
 
 const INDUSTRIES = [
   'Financial Technology', 'E-commerce', 'Healthcare Technology', 
@@ -27,21 +28,21 @@ export default function CompanyProfile() {
   useEffect(() => {
     const fetchCompany = async () => {
       try {
-        const res: any = await apiClient.get('/company/me');
-        const c = res.data?.user?.company;
+        const res = await apiClient.get<{ user?: { company?: { _id?: string } & Record<string, unknown> } }>('/company/me');
+        const c = res.data?.user?.company as (Record<string, unknown> & { _id?: string }) | undefined;
         if (c) {
-          setCompanyId(c._id);
+          setCompanyId(c._id || null);
           setFormData({
-            name: c.name || '',
-            industries: c.industries || [],
-            departments: c.departments || [],
-            specialization: c.specialization || '',
-            size: c.size || 'startup',
-            hiringPhilosophy: c.hiringPhilosophy || 'balanced',
-            email: c.email || '',
-            website: c.website || '',
-            description: c.description || '',
-            skills: (c.skills || []).join(', '),
+            name: (c.name as string) || '',
+            industries: (c.industries as string[]) || [],
+            departments: (c.departments as string[]) || [],
+            specialization: (c.specialization as string) || '',
+            size: (c.size as string) || 'startup',
+            hiringPhilosophy: (c.hiringPhilosophy as string) || 'balanced',
+            email: (c.email as string) || '',
+            website: (c.website as string) || '',
+            description: (c.description as string) || '',
+            skills: Array.isArray(c.skills) ? (c.skills as string[]).join(', ') : '',
           });
         }
       } catch (err) {
@@ -88,12 +89,12 @@ export default function CompanyProfile() {
       if (companyId) {
         await apiClient.put(`/companies/${companyId}`, payload);
       } else {
-        const res: any = await apiClient.post('/companies', payload);
-        setCompanyId(res.data?.company?._id || res.data?._id);
+        const res = await apiClient.post<{ company?: { _id?: string }; _id?: string }>('/companies', payload);
+        setCompanyId(res.data?.company?._id || res.data?._id || null);
       }
       toast.success('Company profile saved successfully');
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to save company profile');
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Failed to save company profile'));
     } finally {
       setSaving(false);
     }

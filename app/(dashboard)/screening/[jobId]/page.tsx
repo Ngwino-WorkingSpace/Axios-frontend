@@ -1,36 +1,100 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import apiClient from '../../../lib/api';
 import { useToast } from '../../../components/Toast';
+import {
+  CandidateIdentity,
+  getCandidateDisplayName,
+  getCandidateInitials,
+  getEvaluationModeLabel,
+  getScreeningModeSummary,
+} from '../../../lib/candidates';
 
-  // Removed mockResults
+const scoreBreakdown = [
+  { key: 'skillMatchScore', label: 'Skills' },
+  { key: 'experienceScore', label: 'Experience' },
+  { key: 'projectScore', label: 'Projects' },
+  { key: 'credibilityScore', label: 'Credibility' },
+  { key: 'companyFitScore', label: 'Fit' },
+] as const;
+
+type ScreeningResultItem = {
+  _id?: string;
+  candidate?: CandidateIdentity & { _id?: string; email?: string };
+  overallScore?: number;
+  skillMatchScore?: number;
+  experienceScore?: number;
+  projectScore?: number;
+  credibilityScore?: number;
+  companyFitScore?: number;
+  rank?: number;
+  strengths?: string[];
+  weaknesses?: string[];
+  reasoning?: string;
+  evaluationMode?: string;
+};
+
+type ScreeningJob = {
+  _id?: string;
+  title?: string;
+  company?: string;
+  shortlistSize?: number;
+};
+
+type ScreeningMeta = {
+  usedLocalFallback?: boolean;
+  screeningMode?: string | null;
+  totalResults?: number;
+  shortlistedResults?: number;
+};
+
+type ScreeningResponse = {
+  data?: {
+    data?: {
+      results?: ScreeningResultItem[];
+      job?: ScreeningJob | null;
+      meta?: ScreeningMeta | null;
+    };
+  };
+};
+
+const badgeClassName = (evaluationMode?: string) => (
+  evaluationMode === 'local-fallback'
+    ? 'bg-amber-50 text-amber-800 border border-amber-200'
+    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+);
 
 export default function ScreeningResults() {
   const { jobId } = useParams() as { jobId: string };
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<ScreeningResultItem[]>([]);
+  const [job, setJob] = useState<ScreeningJob | null>(null);
+  const [meta, setMeta] = useState<ScreeningMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
 
-  const scoreKeys = ['skills', 'experience', 'projects', 'credibility', 'companyFit'] as const;
-  const scoreLabels = ['Skills', 'Experience', 'Projects', 'Credibility', 'Fit'];
-
   useEffect(() => {
     if (!jobId) return;
+
     const fetchResults = async () => {
       try {
-        const res: any = await apiClient.get(`/screening/${jobId}`);
-        setResults(res.data?.results || []);
-      } catch (err) {
+        const res = await apiClient.get(`/screening/${jobId}?shortlistOnly=true`) as ScreeningResponse;
+        const payload = res.data?.data || {};
+
+        setResults(payload.results || []);
+        setJob(payload.job || null);
+        setMeta(payload.meta || null);
+      } catch {
         toast.error('Failed to load screening results.');
       } finally {
         setLoading(false);
       }
     };
+
     fetchResults();
-  }, [jobId]);
+  }, [jobId, toast]);
 
   if (loading) {
     return (
@@ -43,82 +107,117 @@ export default function ScreeningResults() {
     );
   }
 
+  const modeSummary = getScreeningModeSummary(meta?.screeningMode);
+
   return (
     <div className="p-8 max-w-5xl mx-auto animate-fade-in relative">
       <Link href={`/jobs/${jobId}`} className="text-sm text-[#71717a] hover:text-black mb-4 inline-block">← Back to Job</Link>
-      
-      <div className="flex items-end justify-between mb-8">
-        <div>
+
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8">
+        <div className="space-y-2">
           <h1 className="text-2xl font-bold">AI Ranked Shortlist</h1>
-          <p className="text-sm text-[#71717a] mt-1">Top candidates ranked by Gemini AI analysis</p>
+          <p className="text-sm text-[#71717a]">
+            {job?.title ? `${job.title} • ` : ''}{modeSummary.message}
+          </p>
+          <div className="flex flex-wrap gap-2 text-xs text-[#71717a]">
+            <span className="px-2.5 py-1 rounded-full bg-[#f4f4f5] border border-[#e4e4e7]">
+              Showing {results.length} shortlisted candidates
+            </span>
+            {(meta?.totalResults ?? 0) > 0 && (
+              <span className="px-2.5 py-1 rounded-full bg-[#f4f4f5] border border-[#e4e4e7]">
+                {meta?.shortlistedResults ?? 0} shortlisted out of {meta?.totalResults ?? 0} screened
+              </span>
+            )}
+          </div>
         </div>
         <Link href="/emails" className="btn-primary">Notify Candidates</Link>
       </div>
 
+      {meta?.usedLocalFallback && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-amber-800 mb-1">{modeSummary.eyebrow}</p>
+          <p className="text-sm text-amber-900 leading-relaxed">{modeSummary.message}</p>
+        </div>
+      )}
+
       <div className="space-y-6">
         {results.length === 0 ? (
           <div className="text-center py-12 text-[#71717a]">
-            No candidates have been automatically screened for this pipeline yet.
+            No shortlisted candidates have been screened for this pipeline yet.
           </div>
         ) : (
-          results.map((r, index) => (
-            <div key={r._id || index} className="card p-6 relative">
-              {/* Rank */}
-              <div className="absolute top-4 right-4 w-8 h-8 rounded-full bg-[#09090b] text-white flex items-center justify-center text-xs font-bold shadow-md">
-                #{r.rank}
+          results.map((result, index) => (
+            <div key={result._id || index} className="card p-6 relative">
+              <div className="absolute top-4 right-4 flex items-center gap-2">
+                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${badgeClassName(result.evaluationMode)}`}>
+                  {getEvaluationModeLabel(result.evaluationMode)}
+                </span>
+                <div className="w-8 h-8 rounded-full bg-[#09090b] text-white flex items-center justify-center text-xs font-bold shadow-md">
+                  #{result.rank}
+                </div>
               </div>
 
               <div className="flex flex-col lg:flex-row gap-6">
-                {/* Left: Info */}
                 <div className="lg:w-1/3 space-y-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-[#09090b] text-white flex items-center justify-center text-sm font-bold shadow-sm">
-                      {r.candidate?.firstName?.charAt(0) || '?'}
+                      {getCandidateInitials(result.candidate)}
                     </div>
                     <div>
-                      <h2 className="font-bold">{r.candidate?.firstName} {r.candidate?.lastName}</h2>
-                      <p className="text-xs text-[#71717a] mt-0.5">{r.candidate?.email}</p>
+                      <h2 className="font-bold">{getCandidateDisplayName(result.candidate)}</h2>
+                      <p className="text-xs text-[#71717a] mt-0.5">{result.candidate?.email || 'No email available'}</p>
                     </div>
                   </div>
+
                   <div className="flex items-center justify-between p-3 bg-[#fafafa] rounded-lg border border-[#e4e4e7]">
                     <span className="text-sm text-[#71717a] font-medium">Match Score</span>
-                    <span className="text-xl font-bold">{r.matchScore}%</span>
+                    <span className="text-xl font-bold">{result.overallScore}%</span>
                   </div>
-                  <Link href={`/candidates/${r.candidate?._id}`} className="btn-outline w-full text-center block text-sm">View Full Profile</Link>
+
+                  <Link href={`/candidates/${result.candidate?._id}`} className="btn-outline w-full text-center block text-sm">View Full Profile</Link>
                 </div>
 
-                {/* Right: Breakdown */}
                 <div className="lg:w-2/3 grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Score Bars */}
                   <div className="space-y-3">
                     <h3 className="text-xs font-semibold text-[#a1a1aa] uppercase tracking-wider">Algorithm Breakdown</h3>
-                    {scoreKeys.map((key, i) => (
-                      <div key={key} className="flex items-center gap-2">
-                        <span className="text-xs text-[#71717a] w-20">{scoreLabels[i]}</span>
-                        <div className="flex-1 h-1.5 bg-[#f4f4f5] rounded-full overflow-hidden">
-                          <div className="h-full bg-[#09090b] rounded-full" style={{ width: `${r.scores?.[key] || 0}%` }} />
+                    {scoreBreakdown.map((item) => {
+                      const score = result[item.key] || 0;
+
+                      return (
+                        <div key={item.key} className="flex items-center gap-2">
+                          <span className="text-xs text-[#71717a] w-20">{item.label}</span>
+                          <div className="flex-1 h-1.5 bg-[#f4f4f5] rounded-full overflow-hidden">
+                            <div className="h-full bg-[#09090b] rounded-full" style={{ width: `${score}%` }} />
+                          </div>
+                          <span className="text-xs font-medium w-8 text-right">{score}</span>
                         </div>
-                        <span className="text-xs font-medium w-8 text-right">{r.scores?.[key] || 0}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
-                  {/* Reasoning */}
                   <div className="space-y-2">
-                    <h3 className="text-xs font-semibold text-[#a1a1aa] uppercase tracking-wider">AI Justification</h3>
-                    <p className="text-xs text-[#71717a] leading-relaxed line-clamp-3" title={r.reasoning}>{r.reasoning}</p>
+                    <h3 className="text-xs font-semibold text-[#a1a1aa] uppercase tracking-wider">Screening Justification</h3>
+                    <p className="text-xs text-[#71717a] leading-relaxed" title={result.reasoning}>{result.reasoning || 'No reasoning available.'}</p>
                     <div className="grid grid-cols-2 gap-2 pt-2">
                       <div className="p-2 rounded-lg bg-[#dcfce7]/50 border border-[#bbf7d0]">
                         <p className="text-[10px] font-semibold text-[#166534] mb-1">Strengths</p>
-                        <ul className="text-[10px] text-[#166534]/80 space-y-0.5 ml-1">
-                          {r.strengths?.map((s: string, i: number) => <li key={i}>• {s}</li>)}
-                        </ul>
+                        {(result.strengths?.length ?? 0) > 0 ? (
+                          <ul className="text-[10px] text-[#166534]/80 space-y-0.5 ml-1">
+                            {result.strengths?.map((strength: string, strengthIndex: number) => <li key={strengthIndex}>• {strength}</li>)}
+                          </ul>
+                        ) : (
+                          <p className="text-[10px] text-[#166534]/80">No explicit strengths listed.</p>
+                        )}
                       </div>
                       <div className="p-2 rounded-lg bg-[#fef2f2]/50 border border-[#fecaca]">
                         <p className="text-[10px] font-semibold text-[#991b1b] mb-1">Gaps</p>
-                        <ul className="text-[10px] text-[#991b1b]/80 space-y-0.5 ml-1">
-                          {r.weaknesses?.map((w: string, i: number) => <li key={i}>• {w}</li>)}
-                        </ul>
+                        {(result.weaknesses?.length ?? 0) > 0 ? (
+                          <ul className="text-[10px] text-[#991b1b]/80 space-y-0.5 ml-1">
+                            {result.weaknesses?.map((weakness: string, weaknessIndex: number) => <li key={weaknessIndex}>• {weakness}</li>)}
+                          </ul>
+                        ) : (
+                          <p className="text-[10px] text-[#991b1b]/80">No explicit gaps listed.</p>
+                        )}
                       </div>
                     </div>
                   </div>

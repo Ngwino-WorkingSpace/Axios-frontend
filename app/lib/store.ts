@@ -3,7 +3,7 @@
 
 export const makeStore = () => ({
   getState: () => ({}),
-  dispatch: (action: any) => action,
+  dispatch: (action: unknown) => action,
 });
 
 export type AppStore = ReturnType<typeof makeStore>;

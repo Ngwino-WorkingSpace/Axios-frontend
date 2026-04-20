@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import apiClient from '../lib/api';
+import { CandidateIdentity, getCandidateDisplayName, getCandidateInitials, getEvaluationModeLabel } from '../lib/candidates';
 
 const statusBadge = (status: string) => {
   const styles: Record<string, string> = {
@@ -10,24 +12,59 @@ const statusBadge = (status: string) => {
     completed: 'badge-info',
     draft: 'badge-neutral',
   };
+
   return styles[status] || 'badge-neutral';
 };
 
+type DashboardJob = {
+  _id: string;
+  title?: string;
+  totalApplicants?: number;
+  shortlistSize?: number;
+  status?: string;
+};
+
+type DashboardScreening = {
+  _id?: string;
+  candidate?: CandidateIdentity;
+  job?: { title?: string };
+  overallScore?: number;
+  isShortlisted?: boolean;
+  evaluationMode?: string;
+};
+
+type DashboardData = {
+  overview?: {
+    activeJobs?: number;
+    totalCandidates?: number;
+    totalScreenings?: number;
+  };
+  recentJobs?: DashboardJob[];
+  recentScreenings?: DashboardScreening[];
+};
+
+type DashboardResponse = {
+  data?: {
+    data?: DashboardData;
+  };
+};
+
 export default function Dashboard() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
-        const res: any = await apiClient.get('/dashboard');
-        setData(res.data.data);
-      } catch (err) {
-        console.error("Failed to load dashboard data", err);
+        const res = await apiClient.get('/dashboard') as DashboardResponse;
+        setData(res.data?.data || null);
+      } catch (error) {
+        console.error('Failed to load dashboard data', error);
       } finally {
         setLoading(false);
       }
     };
+
     fetchDashboard();
   }, []);
 
@@ -55,7 +92,6 @@ export default function Dashboard() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto animate-fade-in">
-      {/* Header */}
       <div className="flex items-end justify-between mb-10">
         <div>
           <p className="text-sm text-[#71717a] mb-1">Welcome back</p>
@@ -67,7 +103,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         {liveStats.map((stat) => (
           <div key={stat.label} className="stat-card">
@@ -79,11 +114,10 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Jobs Table */}
         <div className="lg:col-span-2 card p-0 overflow-hidden">
           <div className="px-6 py-4 border-b border-[#e4e4e7] flex items-center justify-between">
             <h2 className="font-semibold">Active Job Pipelines</h2>
-            <a href="/jobs" className="text-sm text-[#71717a] hover:text-black transition-colors">View all →</a>
+            <Link href="/jobs" className="text-sm text-[#71717a] hover:text-black transition-colors">View all →</Link>
           </div>
           {recentJobs.length === 0 ? (
             <div className="p-8 text-center text-[#71717a] text-sm">No active jobs found. Create one to get started.</div>
@@ -98,7 +132,7 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {recentJobs.map((job: any) => (
+                {recentJobs.map((job) => (
                   <tr key={job._id} className="table-row">
                     <td className="px-6 py-4 font-medium">{job.title}</td>
                     <td className="px-6 py-4 text-[#71717a]">{job.totalApplicants || 0}</td>
@@ -115,7 +149,6 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Top Candidates */}
         <div className="card p-0 overflow-hidden">
           <div className="px-6 py-4 border-b border-[#e4e4e7]">
             <h2 className="font-semibold">Top Matched Candidates</h2>
@@ -124,20 +157,29 @@ export default function Dashboard() {
             {recentScreenings.length === 0 ? (
               <div className="p-8 text-center text-[#71717a] text-sm">No candidates processed yet.</div>
             ) : (
-              recentScreenings.map((c: any, i: number) => (
-                <div key={i} className="px-6 py-4 flex items-center justify-between hover:bg-[#fafafa] transition-colors">
+              recentScreenings.map((screening, index) => (
+                <div key={screening._id || index} className="px-6 py-4 flex items-center justify-between hover:bg-[#fafafa] transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full bg-[#09090b] text-white flex items-center justify-center text-xs font-bold">
-                      {c.candidate?.name?.charAt(0) || '?'}
+                      {getCandidateInitials(screening.candidate)}
                     </div>
                     <div>
-                      <p className="font-medium text-sm">{c.candidate?.name || 'Unknown'}</p>
-                      <p className="text-xs text-[#a1a1aa] truncate max-w-[120px]">{c.job?.title || 'General'}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm">{getCandidateDisplayName(screening.candidate)}</p>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          screening.evaluationMode === 'local-fallback'
+                            ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        }`}>
+                          {getEvaluationModeLabel(screening.evaluationMode)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#a1a1aa] truncate max-w-[120px]">{screening.job?.title || 'General'}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-sm">{c.overallScore || 0}%</p>
-                    <p className="text-[10px] text-[#a1a1aa]">{c.isShortlisted ? 'Shortlisted' : 'Reviewed'}</p>
+                    <p className="font-bold text-sm">{screening.overallScore || 0}%</p>
+                    <p className="text-[10px] text-[#a1a1aa]">{screening.isShortlisted ? 'Shortlisted' : 'Reviewed'}</p>
                   </div>
                 </div>
               ))
