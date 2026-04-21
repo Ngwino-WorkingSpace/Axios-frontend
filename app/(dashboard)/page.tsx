@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import apiClient from '../lib/api';
-import InstallPwaButton from '../components/InstallPwaButton';
 
 const statusBadge = (status: string) => {
   const styles: Record<string, string> = {
@@ -85,12 +84,9 @@ export default function Dashboard() {
           <p className="text-sm text-[#71717a] mb-1">Welcome back</p>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-          <div className="flex items-center gap-2 text-sm text-[#71717a]">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            AI Engine Online
-          </div>
-          <InstallPwaButton />
+        <div className="flex items-center gap-2 text-sm text-[#71717a]">
+          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          AI Engine Online
         </div>
       </div>
 
